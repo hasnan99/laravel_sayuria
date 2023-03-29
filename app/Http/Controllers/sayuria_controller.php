@@ -8,6 +8,7 @@ use App\Models\sayurmodel;
 use Illuminate\Support\Facades\Auth;    
 use Illuminate\Support\Facades\Hash; 
 use Illuminate\Support\Facades\Session; 
+use DataTables;
 
 class sayuria_controller extends Controller
 {
@@ -18,7 +19,7 @@ class sayuria_controller extends Controller
     }
 
     public function v_beranda(){
-        $data=sayurmodel::all();
+        $data=sayurmodel::paginate(3);
         return view('beranda',compact('data'));
     }
 
@@ -56,7 +57,12 @@ class sayuria_controller extends Controller
                 Auth::guard('web')->logout();
                 return redirect()->route('login')->with('error','akun anda telah diblokir');
             }else{
-                return redirect()->route('beranda');
+                if(Auth::user()->role=='admin'){
+                    return redirect()->route('admin');
+                }else{
+                    return redirect()->route('beranda');
+
+                }
             }
         }else{
             return redirect()->route('login')->with('error','email / username atau password salah');
@@ -90,5 +96,101 @@ class sayuria_controller extends Controller
         Session::flush();
         Auth::logout();
         return redirect(route('beranda'));
+    }
+
+    public function tampil_produk(Request $request){
+        if($request->ajax()){
+            $data=sayurmodel::all('*');
+            return Datatables::of($data)->addIndexColumn()->addColumn('action',function($data){
+                $button = '<button type="button" name="edit" id="'.$data->id.'" class="edit btn btn-primary btn-sm"> <i class="bi bi-pencil-square"></i>Edit</button>';
+                $button .= '   <button type="button" name="edit" id="'.$data->id.'" class="delete btn btn-danger btn-sm"> <i class="bi bi-backspace-reverse-fill"></i> Delete</button>';
+                return $button;
+            })->rawColumns(['action'])->make(true);
+        }
+        $username=Auth::user()->username;
+        return view('welcome',compact('username'));
+    }
+
+    public function tambah_produk(Request $request){
+        $rules=array(
+            'nama_sayur'=>'required',
+            'harga_sayur'=>'required',
+            'stock'=>'required',
+            'deskripsi'=>'required',
+            'gambar'=>'required'
+        );
+        $error=Validator::make($request->all(),$rules);
+
+        if($error->fails()){
+            return response()->json(['errors'=>$error->errors()->all()]);
+        }
+        $form_data=array(
+            'nama_sayur'=>$request->nama_sayur,
+            'harga_sayur'=>$request->harga_sayur,
+            'stock'=>$request->stock,
+            'deskripsi'=>$request->deskripsi,
+            'gambar'=>$request->gambar
+        );
+
+        sayurmodel::create($form_data);
+        return response()->json(['success'=>'Produk Berhasil Di Tambah']);
+    }
+
+    public function edit_produk($id){
+        if(request()->ajax()){
+            $data=sayurmodel::findorFail($id);
+            return response()->json(['result'=>$data]);
+        }
+    }
+
+    public function update_produk(Request $request){
+        $rules=array(
+            'nama_sayur'=>'required',
+            'harga_sayur'=>'required',
+            'stock'=>'required',
+            'deskripsi'=>'required',
+            'gambar'=>'required'
+        );
+        $error=Validator::make($request->all(),$rules);
+        if($error->fails()){
+            return response()->json(['errors'=>$error->errors()->all()]);
+        }
+        $form_data=array(
+            'nama_sayur'=>$request->nama_sayur,
+            'harga_sayur'=>$request->harga_sayur,
+            'stock'=>$request->stock,
+            'deskripsi'=>$request->deskripsi,
+            'gambar'=>$request->gambar
+        );
+        sayurmodel::whereId($request->hidden_id)->update($form_data);
+        return response()->json(['success' => 'Produk Berhasil di updated']);
+    }
+
+    public function hapus_produk($id){
+        $data=sayurmodel::findOrFail($id);
+        $data->delete();
+    }
+
+    public function tampil_user(Request $request){
+        if($request->ajax()){
+            $data=User::all('*');
+            return Datatables::of($data)->addIndexColumn()->addColumn('action',function($data){
+                $button = '<button type="button" name="edit" id="'.$data->id.'" class="delete btn btn-danger btn-sm"> <i class="bi bi-backspace-reverse-fill"></i> Delete</button>';
+                return $button;
+            })->rawColumns(['action'])->make(true);
+        }
+        $username=Auth::user()->username;
+        return view('admin_user',compact('username'));
+    }
+
+    public function hapus_user($id){
+        $data=User::findOrFail($id);
+        $data->delete();
+    }
+
+    public function logout_admin(){
+        Session::flush();
+        Auth::logout();
+        return redirect(route('login'));
     }
 }

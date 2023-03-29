@@ -192,7 +192,7 @@
 				                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-menu">
 				                    <i class="fa fa-bars"></i>
 				                </button>
-				                <a class="navbar-brand" href="index.html"style="position:Left;">SAYURIA</a>
+				                <a class="navbar-brand" href="index.html" style="align:Left;">SAYURIA</a>
 
 				            </div><!--/.navbar-header-->
 				            <!-- End Header Navigation -->
@@ -226,7 +226,7 @@
 			  <div class="sayur-populer-content">
 				<div class="row">
 				  @foreach($data as $sayur)
-				  <div class="col-md-3 col-sm-4" >
+				  <div class="col-sm-6 col-md-4 col-lg-4" >
 					<div class="single-sayur-populer"  >
 					  <div class="single-sayur-populer-bg">
 						<img src="asset/images/collection/{{$sayur->gambar}}" alt="sayur-populer images">
@@ -248,6 +248,10 @@
 					</div>
 				  </div>
 				  @endforeach
+
+				  <div >
+					<a href="#" style="position:absolute; margin-top: 600px">See more produk</a>
+				  </div>
 				</div>
 			  </div>
 			</div><!--/.container-->
