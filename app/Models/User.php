@@ -25,6 +25,8 @@ class User extends Authenticatable
         'email',
         'username',
         'password',
+        'alamat',
+        'profile'
     ];
 
     /**
@@ -48,5 +50,7 @@ class User extends Authenticatable
 
     protected $attributes=[
         'role'=>'user',
+        'alamat'=>'kosong',
+        'profile'=>'kosong',
     ];
 }

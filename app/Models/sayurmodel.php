@@ -32,4 +32,6 @@ class sayurmodel extends Model
         return static::find($id)->delete();
     }
 
+   
+
 }

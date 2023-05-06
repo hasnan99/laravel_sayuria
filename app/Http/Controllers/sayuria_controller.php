@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Validator;
+use Cache;
 use App\Models\User;
+use App\Models\order;
 use App\Models\sayurmodel;
-use Illuminate\Support\Facades\Auth;    
+use Illuminate\Support\Facades\Auth;  
+use Illuminate\Support\Facades\File;    
 use Illuminate\Support\Facades\Hash; 
 use Illuminate\Support\Facades\Session; 
 use DataTables;
@@ -13,19 +16,33 @@ use DataTables;
 class sayuria_controller extends Controller
 {
     public $login_id,$password;
+    public $search_term;
 
     public function v_register(){
         return view('register');
     }
 
+    public function v_produk(){
+        $data=sayurmodel::all();
+        $username = Auth::check() ? Auth::user()->username : null;
+        return view('produk',compact('data','username'));
+    }
+
     public function v_beranda(){
-        $data=sayurmodel::paginate(3);
-        return view('beranda',compact('data'));
+        $data=sayurmodel::orderBy('id', 'desc')->paginate(3);
+        $username = Auth::check() ? Auth::user()->username : null;
+        return view('beranda', compact('data', 'username'));
     }
 
     public function v_login(){
         return view('login');
     }
+
+    public function viewTentangKami()
+    {
+        return view('tentang_kami');
+    }
+
 
     function loginpost(Request $request){
         $this->login_id = $request->input('login_id');
@@ -173,7 +190,7 @@ class sayuria_controller extends Controller
 
     public function tampil_user(Request $request){
         if($request->ajax()){
-            $data=User::all('*');
+            $data=User::where('role','!=','admin')->get();
             return Datatables::of($data)->addIndexColumn()->addColumn('action',function($data){
                 $button = '<button type="button" name="edit" id="'.$data->id.'" class="delete btn btn-danger btn-sm"> <i class="bi bi-backspace-reverse-fill"></i> Delete</button>';
                 return $button;
@@ -182,6 +199,50 @@ class sayuria_controller extends Controller
         $username=Auth::user()->username;
         return view('admin_user',compact('username'));
     }
+
+    public function tampil_order(Request $request){
+        if($request->ajax()){
+            $data=order::with('item_sayur')->get();
+            return Datatables::of($data)
+                ->addIndexColumn()
+                ->addColumn('nama_sayur', function($data){
+                    return $data->item_sayur->nama_sayur;
+                })
+                ->addColumn('action',function($data){
+                    $button = '<button type="button" name="edit" id="'.$data->id.'" class="edit btn btn-primary btn-sm"> <i class="bi bi-pencil-square"></i>Edit</button>';
+                    return $button;
+                })
+                ->rawColumns(['action','nama_sayur'])
+                ->make(true);
+        }
+        $username=Auth::user()->username;
+        return view('admin_order',compact('username'));
+    }
+
+    public function edit_order($id){
+        if(request()->ajax()){
+            $data = order::with('item_sayur')->findOrFail($id);
+            return response()->json(['result'=>$data]);
+        }
+    }
+
+    public function update_order(Request $request){
+        $rules=array(
+            'status'=>'required',
+            'status_pembayaran'=>'required'
+        );
+        $error=Validator::make($request->all(),$rules);
+        if($error->fails()){
+            return response()->json(['errors'=>$error->errors()->all()]);
+        }
+        $form_data=array(
+            'status'=>$request->status,
+            'status_pembayaran'=>$request->status_pembayaran,
+        );
+        order::whereId($request->hidden_id)->update($form_data);
+        return response()->json(['success' => 'Order Berhasil di updated']);
+    }
+    
 
     public function hapus_user($id){
         $data=User::findOrFail($id);
@@ -193,4 +254,65 @@ class sayuria_controller extends Controller
         Auth::logout();
         return redirect(route('login'));
     }
+
+    public function cari_produk(Request $request){
+        $produks = preg_split('/\s+/', $request->input('produk'));
+        $query = sayurmodel::query();
+        foreach ($produks as $produk) {
+            $query->orWhere('nama_sayur', 'like', '%' . $produk . '%');
+        }
+        $data = $query->get();
+    
+        if($data->count() > 0) {
+            return view('components/searchcomponent',['produk'=>$data]);
+        } else {
+            return view('components/searchcomponent',['produk'=>'Produk tidak ditemukan']);
+        }
+    }
+
+    public function detail_produk($id){
+        $data= sayurmodel::find($id);
+        return view('detail',['data'=>$data]);
+    }
+
+    public function v_profile(){
+        $user=Auth::user()->username;
+        return view('profile',compact('user'));
+    }
+
+    public function updateProfile(Request $request){
+        $validated = Validator::make($request->all(), [
+            'nama_depan' => ['required', 'string'],
+            'nama_belakang' => ['required', 'string'],
+            'username' => ['required', 'string'],
+            'alamat' => ['required', 'string'],
+        ]);
+        if (auth()->user()->profile == null) {
+             $validate_image = Validator::make($request->all(), [
+                'profile' => ['required', 'image', 'max:2048']
+            ]);
+            if ($validate_image->fails()) {
+                return response()->json(['code' => 400, 'msg' => $validate_image->errors()->first()]);
+            }
+        }
+        if ($validated->fails()) {
+            return response()->json(['code' => 400, 'msg' => $validated->errors()->first()]);
+        }
+        if ($request->hasFile('profile')) {
+            $imagePath = 'asset/'.auth()->user()->profile;
+            if (File::exists($imagePath)) {
+                File::delete($imagePath);
+            }
+            $profile = $request->profile->store('profile_images', 'public');
+        }
+        auth()->user()->update([
+            'nama_depan' => $request->nama_depan,
+            'nama_belakang' => $request->nama_belakang,
+            'username' => $request->username,
+            'alamat' => $request->alamat,
+            'profile' => $profile ?? auth()->user()->profile 
+        ]);
+        return response()->json(['code' => 200, 'msg' => 'profile updated successfully.']);
+    }
 }
+
